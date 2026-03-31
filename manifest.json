@@ -1,0 +1,19 @@
+{
+  "name": "KML AI Data Check (AU)",
+  "short_name": "KML Data Check",
+  "description": "Client-side KML/KMZ situational awareness data check for BVLOS feasibility (AU).",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#0b1220",
+  "background_color": "#0b1220",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

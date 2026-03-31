@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>KML AI Data Check (AU)</title>
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="description" content="Client-side KML/KMZ situational awareness data check for BVLOS feasibility (AU)." />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+      :root {
+        --bg: #0b1220;
+        --panel: rgba(17, 26, 46, 0.78);
+        --text: #e7eefc;
+        --muted: #a9b7d6;
+        --border: rgba(255, 255, 255, 0.09);
+        --accent: #5aa6ff;
+        --ok: #9fe870;
+        --warn: #ffd37a;
+        --bad: #ff6b6b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+        background: radial-gradient(1200px 700px at 20% 0%, #0e1b38 0%, var(--bg) 45%) fixed;
+        color: var(--text);
+      }
+      .wrap { max-width: 1260px; margin: 0 auto; padding: 18px; }
+      .header {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--panel);
+        backdrop-filter: blur(8px);
+        padding: 14px 16px;
+      }
+      .title { font-size: 18px; font-weight: 720; display:flex; gap:10px; align-items:center; }
+      .badge { font-size: 11px; color: var(--muted); border: 1px solid var(--border); padding: 3px 8px; border-radius: 999px; background: rgba(0,0,0,0.12); }
+      .sub { margin-top: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+      .grid {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: 430px 1fr;
+        gap: 14px;
+      }
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--panel);
+        backdrop-filter: blur(8px);
+        padding: 14px;
+      }
+      h2 { margin: 0 0 10px 0; font-size: 14px; font-weight: 720; }
+      label { font-size: 12px; color: var(--muted); }
+      input[type="file"], input[type="text"], select, textarea {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        padding: 10px;
+        background: rgba(0,0,0,0.18);
+        color: var(--text);
+      }
+      textarea { min-height: 84px; resize: vertical; }
+      .row { display: grid; gap: 8px; margin-bottom: 12px; }
+      .hint { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+      .checks {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(0,0,0,0.12);
+      }
+      .checks label { display: flex; gap: 10px; align-items: center; color: var(--text); font-size: 12.5px; }
+      .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+      button {
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        padding: 10px 12px;
+        background: linear-gradient(180deg, rgba(90,166,255,0.22), rgba(90,166,255,0.1));
+        color: var(--text);
+        cursor: pointer;
+        font-weight: 650;
+      }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      #map { height: 720px; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+      .tabs { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+      .tab { padding: 8px 10px; background: rgba(0,0,0,0.12); }
+      .tab.active { border-color: rgba(90,166,255,0.65); }
+      .out {
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.35;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: rgba(0,0,0,0.12);
+        padding: 10px;
+        max-height: 320px;
+        overflow: auto;
+      }
+      .pill { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:999px; padding:6px 10px; background: rgba(0,0,0,0.12); font-size:12px; color: var(--muted); }
+      .dot { width:10px; height:10px; border-radius:999px; background: var(--muted); display:inline-block; }
+      .dot.ok { background: var(--ok); }
+      .dot.warn { background: var(--warn); }
+      .dot.bad { background: var(--bad); }
+      .small { font-size: 11.5px; color: var(--muted); }
+      code { color: #d9e6ff; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="header">
+        <div class="title">
+          KML AI Data Check (AU)
+          <span class="badge">hosted PWA (client-side)</span>
+        </div>
+        <div class="sub">
+          Your KML/KMZ file is processed locally in your browser. This tool calls public data services (Overpass/Open‑Meteo) using ring bounding boxes.
+          Decision support only: verify airspace/NOTAM/obstacles via approved sources.
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Upload + configure</h2>
+
+          <div class="row">
+            <label>KML/KMZ file</label>
+            <input id="kmlFile" type="file" accept=".kml,.kmz" />
+          </div>
+
+          <div class="row">
+            <label>Rings (km) JSON</label>
+            <input id="ringsJson" type="text" value="[1,3,5]" />
+            <div class="hint">Example: <code>[1,3,5]</code> creates 0–1, 1–3, 3–5 km rings around the uploaded geometry.</div>
+          </div>
+
+          <div class="row">
+            <label>AI summary</label>
+            <select id="aiMode">
+              <option value="template" selected>Template (no AI)</option>
+              <option value="gemini">Gemini (user API key)</option>
+            </select>
+            <div class="hint">For privacy, the app sends only derived metrics/facts (not the raw KML file) to Gemini.</div>
+          </div>
+
+          <div id="geminiRow" class="row" style="display:none;">
+            <label>Gemini API key</label>
+            <input id="geminiKey" type="text" inputmode="text" autocomplete="off" placeholder="Paste key…" />
+            <label style="display:flex; gap:10px; align-items:center; font-size:12.5px; color:var(--text);">
+              <input id="rememberGeminiKey" type="checkbox" />
+              Remember key on this device (localStorage)
+            </label>
+            <div class="hint">If you don’t remember the key, you’ll be prompted each time. Never share your key publicly.</div>
+          </div>
+
+          <div class="row">
+            <label>Population density source</label>
+            <select id="popSource">
+              <option value="none" selected>None (no population density)</option>
+              <option value="geotiff">GeoTIFF upload (people/km² band 0, WGS84)</option>
+            </select>
+          </div>
+
+          <div class="row" id="geotiffRow" style="display:none;">
+            <label>Population GeoTIFF file</label>
+            <input id="popTiffFile" type="file" accept=".tif,.tiff,application/geotiff" />
+            <div class="small">Expected: band 0 values = people/km².</div>
+            <div class="pill" style="margin-top:8px;">
+              <span id="tiffDot" class="dot"></span>
+              <span id="tiffStatus">GeoTIFF: not loaded</span>
+            </div>
+          </div>
+
+          <div class="checks">
+            <label><input id="useOsm" type="checkbox" checked /> OSM features (Overpass): schools, aerodromes/helipads, rail, landuse, buildings, obstacles</label>
+            <label><input id="useTerrain" type="checkbox" checked /> Terrain max elevation (Open‑Meteo elevation sampling)</label>
+            <label><input id="useAirspaceUpload" type="checkbox" /> Airspace upload overlay (GeoJSON only, optional)</label>
+          </div>
+
+          <div class="row" id="airspaceRow" style="display:none; margin-top:12px;">
+            <label>Airspace GeoJSON file (optional)</label>
+            <input id="airspaceFile" type="file" accept=".geojson,application/geo+json,application/json" />
+          </div>
+
+          <div class="actions" style="margin-top:12px;">
+            <button id="runBtn">Run analysis</button>
+            <button id="downloadBtn" disabled>Download report.json</button>
+          </div>
+
+          <div class="tabs">
+            <button class="tab active" data-tab="narrative">Narrative</button>
+            <button class="tab" data-tab="metrics">Metrics</button>
+            <button class="tab" data-tab="limitations">Limitations</button>
+            <button class="tab" data-tab="facts">Facts (raw)</button>
+          </div>
+          <div id="tabNarrative" class="out"></div>
+          <div id="tabMetrics" class="out" style="display:none;"></div>
+          <div id="tabLimitations" class="out" style="display:none;"></div>
+          <div id="tabFacts" class="out" style="display:none;"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Map</h2>
+          <div id="map"></div>
+          <div class="hint" style="margin-top:10px;">
+            Rings are blue. Uploaded geometry is green. Terrain max points are yellow. Airspace upload (if provided) is magenta.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Register service worker (updates auto on refresh).
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").catch(() => {});
+        });
+      }
+    </script>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://unpkg.com/@tmcw/togeojson@5.7.0/dist/togeojson.umd.js"></script>
+    <script src="https://unpkg.com/geotiff@2.1.4/dist-browser/geotiff.js"></script>
+
+    <script>
+      const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+      const ELEV_URL = "https://api.open-meteo.com/v1/elevation";
+
+      const ui = {
+        kmlFile: document.getElementById("kmlFile"),
+        ringsJson: document.getElementById("ringsJson"),
+        aiMode: document.getElementById("aiMode"),
+        geminiRow: document.getElementById("geminiRow"),
+        geminiKey: document.getElementById("geminiKey"),
+        rememberGeminiKey: document.getElementById("rememberGeminiKey"),
+        popSource: document.getElementById("popSource"),
+        geotiffRow: document.getElementById("geotiffRow"),
+        popTiffFile: document.getElementById("popTiffFile"),
+        tiffDot: document.getElementById("tiffDot"),
+        tiffStatus: document.getElementById("tiffStatus"),
+        useOsm: document.getElementById("useOsm"),
+        useTerrain: document.getElementById("useTerrain"),
+        useAirspaceUpload: document.getElementById("useAirspaceUpload"),
+        airspaceRow: document.getElementById("airspaceRow"),
+        airspaceFile: document.getElementById("airspaceFile"),
+        runBtn: document.getElementById("runBtn"),
+        downloadBtn: document.getElementById("downloadBtn"),
+        tabButtons: Array.from(document.querySelectorAll(".tab")),
+        tabNarrative: document.getElementById("tabNarrative"),
+        tabMetrics: document.getElementById("tabMetrics"),
+        tabLimitations: document.getElementById("tabLimitations"),
+        tabFacts: document.getElementById("tabFacts"),
+      };
+
+      function setTiffStatus(state, text) {
+        ui.tiffDot.className = "dot";
+        if (state) ui.tiffDot.classList.add(state);
+        ui.tiffStatus.textContent = text;
+      }
+
+      ui.popSource.addEventListener("change", () => {
+        ui.geotiffRow.style.display = ui.popSource.value === "geotiff" ? "" : "none";
+      });
+      ui.useAirspaceUpload.addEventListener("change", () => {
+        ui.airspaceRow.style.display = ui.useAirspaceUpload.checked ? "" : "none";
+      });
+      ui.aiMode.addEventListener("change", () => {
+        ui.geminiRow.style.display = ui.aiMode.value === "gemini" ? "" : "none";
+      });
+
+      // Gemini key persistence (user-controlled)
+      const GEMINI_KEY_LS = "kml_ai_data_check_gemini_key";
+      const GEMINI_REMEMBER_LS = "kml_ai_data_check_gemini_remember";
+      (function initGeminiUi() {
+        try {
+          const remember = localStorage.getItem(GEMINI_REMEMBER_LS) === "1";
+          ui.rememberGeminiKey.checked = remember;
+          if (remember) {
+            const k = localStorage.getItem(GEMINI_KEY_LS) || "";
+            ui.geminiKey.value = k;
+          }
+        } catch (_) {}
+      })();
+      ui.rememberGeminiKey.addEventListener("change", () => {
+        try {
+          localStorage.setItem(GEMINI_REMEMBER_LS, ui.rememberGeminiKey.checked ? "1" : "0");
+          if (!ui.rememberGeminiKey.checked) localStorage.removeItem(GEMINI_KEY_LS);
+          else if (ui.geminiKey.value) localStorage.setItem(GEMINI_KEY_LS, ui.geminiKey.value);
+        } catch (_) {}
+      });
+      ui.geminiKey.addEventListener("input", () => {
+        try {
+          if (ui.rememberGeminiKey.checked) localStorage.setItem(GEMINI_KEY_LS, ui.geminiKey.value || "");
+        } catch (_) {}
+      });
+
+      ui.tabButtons.forEach((b) => {
+        b.addEventListener("click", () => {
+          ui.tabButtons.forEach((x) => x.classList.remove("active"));
+          b.classList.add("active");
+          const t = b.dataset.tab;
+          ui.tabNarrative.style.display = t === "narrative" ? "" : "none";
+          ui.tabMetrics.style.display = t === "metrics" ? "" : "none";
+          ui.tabLimitations.style.display = t === "limitations" ? "" : "none";
+          ui.tabFacts.style.display = t === "facts" ? "" : "none";
+        });
+      });
+
+      const map = L.map("map", { preferCanvas: true }).setView([-25.0, 133.0], 4);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
+
+      const layers = {
+        upload: L.layerGroup().addTo(map),
+        rings: L.layerGroup().addTo(map),
+        points: L.layerGroup().addTo(map),
+        airspace: L.layerGroup().addTo(map),
+      };
+
+      function clearLayers() {
+        Object.values(layers).forEach((l) => l.clearLayers());
+      }
+
+      function fitGeoJson(geojson) {
+        try {
+          const l = L.geoJSON(geojson);
+          map.fitBounds(l.getBounds(), { padding: [18, 18] });
+        } catch (_) {}
+      }
+
+      function downloadJson(obj, filename) {
+        const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      // --- KML/KMZ ingest (client-side) ---
+      async function readKmlTextFromFile(file) {
+        const name = (file.name || "").toLowerCase();
+        const buf = await file.arrayBuffer();
+        if (name.endsWith(".kml")) return new TextDecoder("utf-8").decode(buf);
+        if (name.endsWith(".kmz")) {
+          const zip = await JSZip.loadAsync(buf);
+          const kmlName = Object.keys(zip.files).find((n) => n.toLowerCase().endsWith(".kml"));
+          if (!kmlName) throw new Error("KMZ does not contain a KML file.");
+          return await zip.files[kmlName].async("string");
+        }
+        throw new Error("File must be .kml or .kmz");
+      }
+
+      function kmlToGeoJson(kmlText) {
+        const xml = new DOMParser().parseFromString(kmlText, "text/xml");
+        const gj = toGeoJSON.kml(xml);
+        if (!gj || !gj.features || !gj.features.length) throw new Error("No features found in KML.");
+        return gj;
+      }
+
+      function normalizeOpsGeometry(uploadGJ) {
+        const fc = uploadGJ.type === "FeatureCollection" ? uploadGJ : { type: "FeatureCollection", features: [uploadGJ] };
+        const geomTypes = new Set(fc.features.map((f) => f.geometry && f.geometry.type).filter(Boolean));
+        let base = null;
+        if (geomTypes.has("Polygon") || geomTypes.has("MultiPolygon")) {
+          const polys = fc.features.filter((f) => f.geometry && (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon"));
+          base = polys[0] || null;
+          for (let i = 1; i < polys.length; i++) {
+            try { base = turf.union(base, polys[i]); } catch (_) {}
+          }
+        }
+        if (!base) {
+          const lineOrPts = fc.features.find((f) => f.geometry && (f.geometry.type === "LineString" || f.geometry.type === "MultiLineString" || f.geometry.type === "Point" || f.geometry.type === "MultiPoint"));
+          if (!lineOrPts) throw new Error("Unsupported geometry types in KML.");
+          base = turf.buffer(lineOrPts, 50, { units: "meters" });
+        }
+        return base;
+      }
+
+      function buildRings(baseFeature, ringBoundsKm) {
+        const bounds = [...new Set(ringBoundsKm.map(Number).filter((x) => isFinite(x) && x > 0))].sort((a, b) => a - b);
+        let innerKm = 0;
+        const rings = [];
+        for (const outerKm of bounds) {
+          const outer = turf.buffer(baseFeature, outerKm, { units: "kilometers" });
+          const inner = innerKm > 0 ? turf.buffer(baseFeature, innerKm, { units: "kilometers" }) : null;
+          let ring = outer;
+          if (inner) {
+            try { ring = turf.difference(outer, inner) || outer; } catch (_) { ring = outer; }
+          }
+          rings.push({ id: `ring_${Math.round(innerKm * 1000)}m_${Math.round(outerKm * 1000)}m`, inner_km: innerKm, outer_km: outerKm, feature: ring });
+          innerKm = outerKm;
+        }
+        return rings;
+      }
+
+      // --- Population GeoTIFF sampling (optional) ---
+      let popTiffImage = null;
+      let popTiffNoData = null;
+
+      async function loadPopGeoTiffFromFile(file) {
+        const GeoTIFF = window.GeoTIFF || window.geotiff;
+        if (!GeoTIFF || !GeoTIFF.fromBlob) throw new Error("GeoTIFF library not available.");
+        const t = await GeoTIFF.fromBlob(file);
+        const img = await t.getImage();
+        let noData = null;
+        try {
+          const fd = img.getFileDirectory();
+          if (fd && fd.GDAL_NODATA != null) noData = parseFloat(String(fd.GDAL_NODATA).trim());
+        } catch (_) {}
+        popTiffImage = img;
+        popTiffNoData = noData;
+      }
+
+      async function readTiffAtLonLat(lon, lat) {
+        if (!popTiffImage) return null;
+        const bbox = popTiffImage.getBoundingBox();
+        const [minX, minY, maxX, maxY] = bbox;
+        const width = popTiffImage.getWidth();
+        const height = popTiffImage.getHeight();
+        const resX = (maxX - minX) / width;
+        const resY = (maxY - minY) / height;
+        const col = Math.floor((lon - minX) / resX);
+        const row = Math.floor((maxY - lat) / resY);
+        if (col < 0 || col >= width || row < 0 || row >= height) return null;
+        const rasters = await popTiffImage.readRasters({ window: [col, row, col + 1, row + 1], samples: [0] });
+        const raw = rasters[0] && rasters[0][0] != null ? rasters[0][0] : null;
+        if (raw == null) return null;
+        const val = typeof raw === "number" ? raw : Number(raw);
+        if (!isFinite(val)) return null;
+        if (popTiffNoData != null && val === popTiffNoData) return 0;
+        if (val < 0) return 0;
+        return Math.round(val * 100) / 100;
+      }
+
+      // --- Providers ---
+      function citation(source_name, source_url, method, license) {
+        return { source_name, source_url, method, license, retrieved_at: new Date().toISOString() };
+      }
+
+      async function overpassFetch(query) {
+        const res = await fetch(OVERPASS_URL, { method: "POST", body: query });
+        if (!res.ok) throw new Error(`Overpass error ${res.status}`);
+        return res.json();
+      }
+
+      function ringBbox(ringFeature) {
+        return turf.bbox(ringFeature);
+      }
+
+      function classifyOsmTags(tags) {
+        if (!tags) return "other";
+        if (tags.amenity === "school") return "schools";
+        if (tags.aeroway) return "aerodromes";
+        if (tags.railway) return "rail";
+        if (tags.landuse) return "landuse";
+        if (tags.building) return "buildings";
+        if ((tags.man_made && /mast|tower|chimney/.test(tags.man_made)) || (tags.power && /tower|pole|line|minor_line/.test(tags.power))) return "obstacles";
+        if (tags.place || tags.boundary === "administrative") return "area_name";
+        return "other";
+      }
+
+      function elementToPoint(el) {
+        if (el.type === "node" && el.lat != null && el.lon != null) return turf.point([el.lon, el.lat]);
+        if ((el.type === "way" || el.type === "relation") && Array.isArray(el.geometry) && el.geometry.length) {
+          const coords = el.geometry.map((g) => [g.lon, g.lat]).filter((c) => isFinite(c[0]) && isFinite(c[1]));
+          if (coords.length < 2) return null;
+          return turf.center(turf.lineString(coords));
+        }
+        return null;
+      }
+
+      async function enrichOsm(rings) {
+        const facts = [];
+        const metrics = [];
+        const limitations = [];
+
+        for (const ring of rings) {
+          const b = ringBbox(ring.feature);
+          const bbox = `${b[1]},${b[0]},${b[3]},${b[2]}`;
+          const q = `[out:json][timeout:60];(
+            node["amenity"="school"](${bbox}); way["amenity"="school"](${bbox}); relation["amenity"="school"](${bbox});
+            node["aeroway"~"aerodrome|airstrip|heliport|helipad"](${bbox}); way["aeroway"~"aerodrome|airstrip|heliport|helipad"](${bbox}); relation["aeroway"~"aerodrome|airstrip|heliport|helipad"](${bbox});
+            way["railway"~"rail|light_rail|subway|tram"](${bbox}); relation["railway"~"rail|light_rail|subway|tram"](${bbox});
+            way["landuse"](${bbox}); relation["landuse"](${bbox});
+            way["building"](${bbox}); relation["building"](${bbox});
+            node["man_made"~"tower|mast|chimney"](${bbox}); way["man_made"~"tower|mast|chimney"](${bbox}); relation["man_made"~"tower|mast|chimney"](${bbox});
+            node["power"~"tower|pole"](${bbox}); way["power"~"line|minor_line"](${bbox});
+            node["place"](${bbox}); way["place"](${bbox}); relation["place"](${bbox});
+            relation["boundary"="administrative"](${bbox}); node["boundary"="administrative"](${bbox});
+          ); out body; >; out skel qt;`;
+
+          let data;
+          try {
+            data = await overpassFetch(q);
+          } catch (e) {
+            limitations.push(`OSM Overpass failed for ${ring.id}: ${e.message || e}`);
+            continue;
+          }
+
+          const counts = { schools: 0, aerodromes: 0, rail: 0, obstacles: 0, landuse_features: 0, building_features: 0 };
+          for (const el of (data.elements || [])) {
+            const tags = el.tags || {};
+            const cat = classifyOsmTags(tags);
+            const pt = elementToPoint(el);
+            if (!pt) continue;
+            let inside = false;
+            try { inside = turf.booleanPointInPolygon(pt, ring.feature); } catch (_) {}
+            if (!inside) continue;
+
+            if (cat === "schools") counts.schools++;
+            else if (cat === "aerodromes") counts.aerodromes++;
+            else if (cat === "rail") counts.rail++;
+            else if (cat === "obstacles") counts.obstacles++;
+            else if (cat === "landuse") counts.landuse_features++;
+            else if (cat === "buildings") counts.building_features++;
+
+            facts.push({
+              id: `osm_${ring.id}_${el.type}_${el.id}`,
+              category: cat,
+              ring_id: ring.id,
+              geometry: pt.geometry,
+              properties: { tags, osm_id: el.id, osm_type: el.type },
+              citation: citation("OpenStreetMap (Overpass API)", OVERPASS_URL, "Overpass bbox + ring filter", "ODbL"),
+              confidence: 0.7,
+            });
+          }
+
+          Object.entries(counts).forEach(([k, v]) => {
+            metrics.push({ ring_id: ring.id, key: `osm_${k}`, value: v, unit: null, notes: null });
+          });
+        }
+
+        return { facts, metrics, limitations };
+      }
+
+      async function enrichTerrainMax(rings) {
+        const facts = [];
+        const metrics = [];
+        const limitations = [];
+        for (const ring of rings) {
+          let coords = [];
+          try {
+            const g = ring.feature.geometry;
+            if (g.type === "Polygon") coords = g.coordinates[0];
+            else if (g.type === "MultiPolygon") coords = g.coordinates[0][0];
+          } catch (_) {}
+          if (!coords || !coords.length) continue;
+          const step = Math.max(1, Math.ceil(coords.length / 30));
+          const sample = coords.filter((_, i) => i % step === 0).slice(0, 30);
+          const lats = sample.map((c) => c[1]).join(",");
+          const lons = sample.map((c) => c[0]).join(",");
+          try {
+            const res = await fetch(`${ELEV_URL}?latitude=${encodeURIComponent(lats)}&longitude=${encodeURIComponent(lons)}`);
+            if (!res.ok) throw new Error(`elevation ${res.status}`);
+            const d = await res.json();
+            const elev = d.elevation || [];
+            let max = null;
+            let idx = -1;
+            elev.forEach((v, i) => { if (v != null && (max == null || v > max)) { max = v; idx = i; } });
+            if (max == null || idx < 0) continue;
+            const maxPt = sample[idx];
+            facts.push({
+              id: `terrain_max_${ring.id}`,
+              category: "terrain",
+              ring_id: ring.id,
+              geometry: { type: "Point", coordinates: [maxPt[0], maxPt[1]] },
+              properties: { max_elevation_m: max, sampling_points: sample.length },
+              citation: citation("Open‑Meteo Elevation API", ELEV_URL, "Boundary sampling max elevation", "Provider terms"),
+              confidence: 0.6,
+              notes: "Sampling-based max elevation; not certified aviation obstacle/terrain data.",
+            });
+            metrics.push({ ring_id: ring.id, key: "terrain_max_elevation_m", value: max, unit: "m", notes: "sampling" });
+          } catch (e) {
+            limitations.push(`Terrain sampling failed for ${ring.id}: ${e.message || e}`);
+          }
+        }
+        return { facts, metrics, limitations };
+      }
+
+      async function enrichPopulationDensity(rings) {
+        const facts = [];
+        const metrics = [];
+        const limitations = [];
+        if (ui.popSource.value !== "geotiff") {
+          limitations.push("Population density not computed: no population source selected.");
+          return { facts, metrics, limitations };
+        }
+        if (!popTiffImage) {
+          limitations.push("Population density not computed: GeoTIFF not loaded.");
+          return { facts, metrics, limitations };
+        }
+        for (const ring of rings) {
+          let c;
+          try { c = turf.centerOfMass(ring.feature); } catch (_) { c = turf.center(ring.feature); }
+          const lon = c.geometry.coordinates[0];
+          const lat = c.geometry.coordinates[1];
+          try {
+            const dens = await readTiffAtLonLat(lon, lat);
+            if (dens == null) {
+              limitations.push(`Population density unavailable for ${ring.id}: outside GeoTIFF extent.`);
+              continue;
+            }
+            metrics.push({ ring_id: ring.id, key: "population_density_people_per_km2", value: dens, unit: "people/km²", notes: "GeoTIFF sample at ring center" });
+            facts.push({
+              id: `pop_${ring.id}`,
+              category: "population",
+              ring_id: ring.id,
+              geometry: c.geometry,
+              properties: { population_density_people_per_km2: dens, sampling: "center_of_mass" },
+              citation: citation("User-provided population GeoTIFF", null, "Band-0 sample at ring center", "User dataset"),
+              confidence: 0.7,
+            });
+          } catch (e) {
+            limitations.push(`Population density failed for ${ring.id}: ${e.message || e}`);
+          }
+        }
+        return { facts, metrics, limitations };
+      }
+
+      function deriveAreaName(facts) {
+        const names = new Map();
+        for (const f of facts) {
+          if (f.category !== "area_name") continue;
+          const tags = (f.properties && f.properties.tags) || {};
+          const n = tags.name || tags["name:en"] || tags.official_name;
+          if (!n) continue;
+          names.set(n, (names.get(n) || 0) + 1);
+        }
+        if (!names.size) return null;
+        return Array.from(names.entries()).sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])))[0][0];
+      }
+
+      function metricIndex(metrics) {
+        const idx = {};
+        metrics.forEach((m) => {
+          idx[m.ring_id] ||= {};
+          idx[m.ring_id][m.key] = m.value;
+        });
+        return idx;
+      }
+
+      function proxyHigherPopulationTimes(mByRing) {
+        const out = {};
+        for (const ringId of Object.keys(mByRing)) {
+          const schools = Number(mByRing[ringId].osm_schools || 0);
+          const rail = Number(mByRing[ringId].osm_rail || 0);
+          const buildings = Number(mByRing[ringId].osm_building_features || 0);
+          const landuse = Number(mByRing[ringId].osm_landuse_features || 0);
+          const signals = [];
+          if (schools > 0) signals.push("school_dropoff_pickup_weekdays_0800_0930_1430_1630");
+          if (rail > 0) signals.push("commuter_peaks_weekdays_0700_0930_1600_1830");
+          if (buildings > 200 || landuse > 200) signals.push("higher_activity_daytime_0900_1800");
+          if (!signals.length) signals.push("unknown_insufficient_signals");
+          out[ringId] = signals.join(";");
+        }
+        return out;
+      }
+
+      function buildQuantitativeDescriptor(mByRing) {
+        const lines = [];
+        for (const ringId of Object.keys(mByRing)) {
+          const schools = mByRing[ringId].osm_schools ?? 0;
+          const aerodromes = mByRing[ringId].osm_aerodromes ?? 0;
+          const rail = mByRing[ringId].osm_rail ?? 0;
+          const obstacles = mByRing[ringId].osm_obstacles ?? 0;
+          const buildings = mByRing[ringId].osm_building_features ?? 0;
+          const landuse = mByRing[ringId].osm_landuse_features ?? 0;
+          const pop = mByRing[ringId].population_density_people_per_km2;
+          lines.push(`${ringId}: pop=${pop ?? "n/a"} people/km², schools=${schools}, aerodromes=${aerodromes}, rail=${rail}, obstacles=${obstacles}, buildings(features)=${buildings}, landuse(features)=${landuse}`);
+        }
+        return lines.join("\n");
+      }
+
+      function renderNarrative(areaName, rings, mByRing, limitations) {
+        const lines = [];
+        lines.push("Summary");
+        lines.push(`- Area name (best-effort from OSM): ${areaName ?? "unknown"}`);
+        lines.push("- Decision-support only. Verify airspace/NOTAM/obstacles via approved sources.");
+        lines.push("- Proxies: higher-population-times and rail-busyness are heuristic indicators, not authoritative.");
+        lines.push("");
+        lines.push("Ring-by-ring (neighboring ground/airspace)");
+        const peaks = proxyHigherPopulationTimes(mByRing);
+        for (const r of rings) {
+          const m = mByRing[r.id] || {};
+          lines.push(`- ${r.id} (${r.inner_km.toFixed(1)}–${r.outer_km.toFixed(1)} km)`);
+          lines.push(`  - Population density: ${m.population_density_people_per_km2 ?? "n/a"} people/km²`);
+          lines.push(`  - Higher population times (proxy): ${peaks[r.id] ?? "unknown_insufficient_signals"}`);
+          lines.push(`  - Schools (OSM): ${m.osm_schools ?? 0} (opening times / student counts often unavailable in OSM)`);
+          lines.push(`  - Aerodromes/helipads (OSM): ${m.osm_aerodromes ?? 0}`);
+          lines.push(`  - Rail features (OSM): ${m.osm_rail ?? 0} (busy = proxy)`);
+          lines.push(`  - Obstacle indicators (OSM): ${m.osm_obstacles ?? 0} (highest obstacle not authoritative)`);
+          if (m.terrain_max_elevation_m != null) lines.push(`  - Terrain max elevation (sampling): ${m.terrain_max_elevation_m} m`);
+        }
+        lines.push("");
+        lines.push("Quantitative descriptor (computed)");
+        lines.push(buildQuantitativeDescriptor(mByRing));
+        lines.push("");
+        lines.push("Qualitative descriptor (template)");
+        lines.push("- Narrative is grounded in computed metrics + collected evidence; verify operational constraints via approved sources.");
+        lines.push("");
+        lines.push("Limitations");
+        if (!limitations.length) lines.push("- none recorded");
+        else limitations.slice(0, 60).forEach((x) => lines.push(`- ${x}`));
+        if (limitations.length > 60) lines.push(`- ... and ${limitations.length - 60} more`);
+        return lines.join("\n");
+      }
+
+      function buildGeminiPayload({ areaName, rings, metrics, limitations }) {
+        // Minimize what leaves the device: no raw KML / full geometry.
+        // Provide just ring boundaries and computed metrics.
+        const ringSummaries = rings.map((r) => ({
+          id: r.id,
+          inner_km: r.inner_km,
+          outer_km: r.outer_km,
+        }));
+        return {
+          area_name: areaName ?? null,
+          rings: ringSummaries,
+          metrics: metrics,
+          limitations: limitations,
+          notes: {
+            privacy: "No raw KML or full coordinates were included; ring ids and metrics only.",
+            heuristic_notice: "Higher-population-times and busy-rail are proxies derived from OSM feature counts.",
+          },
+        };
+      }
+
+      async function generateNarrativeWithGemini({ apiKey, payload }) {
+        const model = "gemini-2.0-flash";
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
+          apiKey
+        )}`;
+
+        const prompt =
+          "You are drafting an evidence-linked situational awareness footprint for an Australian BVLOS RPAS feasibility assessment (CASA broad area intent).\n" +
+          "Rules:\n" +
+          "- Do not invent facts.\n" +
+          "- Explicitly label any heuristic/proxy.\n" +
+          "- Organize by rings.\n" +
+          "- Include: Summary, Ring-by-ring, Key risks/unknowns, Limitations.\n\n" +
+          "INPUT_JSON:\n" +
+          JSON.stringify(payload);
+
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.2 },
+          }),
+        });
+        if (!res.ok) {
+          const t = await res.text().catch(() => "");
+          throw new Error(`Gemini HTTP ${res.status}${t ? `: ${t}` : ""}`);
+        }
+        const data = await res.json();
+        const text =
+          data &&
+          data.candidates &&
+          data.candidates[0] &&
+          data.candidates[0].content &&
+          data.candidates[0].content.parts &&
+          data.candidates[0].content.parts[0] &&
+          data.candidates[0].content.parts[0].text
+            ? String(data.candidates[0].content.parts[0].text)
+            : "";
+        if (!text.trim()) throw new Error("Gemini returned empty response.");
+        return text.trim();
+      }
+
+      async function readGeoJsonFromFile(file) {
+        const text = await file.text();
+        return JSON.parse(text);
+      }
+
+      function addAirspaceLayer(geojson) {
+        const l = L.geoJSON(geojson, { style: { color: "#ff4dff", weight: 2, fillOpacity: 0.08 } });
+        l.addTo(layers.airspace);
+      }
+
+      let lastReport = null;
+
+      ui.popTiffFile.addEventListener("change", async () => {
+        const f = ui.popTiffFile.files && ui.popTiffFile.files[0];
+        if (!f) return;
+        setTiffStatus("warn", "GeoTIFF: loading…");
+        try {
+          await loadPopGeoTiffFromFile(f);
+          setTiffStatus("ok", `GeoTIFF: ready (${f.name})`);
+        } catch (e) {
+          popTiffImage = null;
+          setTiffStatus("bad", `GeoTIFF: failed (${e.message || e})`);
+        }
+      });
+
+      ui.downloadBtn.addEventListener("click", () => {
+        if (!lastReport) return;
+        downloadJson(lastReport, "report.json");
+      });
+
+      ui.runBtn.addEventListener("click", async () => {
+        ui.downloadBtn.disabled = true;
+        ui.runBtn.disabled = true;
+        ui.runBtn.textContent = "Running…";
+        ui.tabNarrative.textContent = "Running analysis…";
+        ui.tabMetrics.textContent = "";
+        ui.tabLimitations.textContent = "";
+        ui.tabFacts.textContent = "";
+        clearLayers();
+
+        try {
+          const file = ui.kmlFile.files && ui.kmlFile.files[0];
+          if (!file) throw new Error("Please choose a KML or KMZ file.");
+
+          let ringsKm;
+          try {
+            ringsKm = JSON.parse(ui.ringsJson.value || "[]");
+            if (!Array.isArray(ringsKm)) throw new Error("rings must be a JSON list");
+          } catch (_) {
+            throw new Error("Invalid rings JSON. Example: [1,3,5]");
+          }
+
+          const kmlText = await readKmlTextFromFile(file);
+          const uploadGJ = kmlToGeoJson(kmlText);
+          const base = normalizeOpsGeometry(uploadGJ);
+          const rings = buildRings(base, ringsKm);
+
+          L.geoJSON(uploadGJ, { style: { color: "#9fe870", weight: 2, fillOpacity: 0.05 } }).addTo(layers.upload);
+          rings.forEach((r) => {
+            L.geoJSON(r.feature, { style: { color: "#5aa6ff", weight: 2, fillOpacity: 0.06 } })
+              .bindTooltip(`${r.id} (${r.inner_km}-${r.outer_km} km)`, { sticky: true })
+              .addTo(layers.rings);
+          });
+          fitGeoJson(uploadGJ);
+
+          if (ui.useAirspaceUpload.checked) {
+            const af = ui.airspaceFile.files && ui.airspaceFile.files[0];
+            if (af) addAirspaceLayer(await readGeoJsonFromFile(af));
+          }
+
+          const facts = [];
+          const metrics = [];
+          const limitations = [];
+
+          const popOut = await enrichPopulationDensity(rings);
+          facts.push(...popOut.facts); metrics.push(...popOut.metrics); limitations.push(...popOut.limitations);
+
+          if (ui.useOsm.checked) {
+            const osmOut = await enrichOsm(rings);
+            facts.push(...osmOut.facts); metrics.push(...osmOut.metrics); limitations.push(...osmOut.limitations);
+          } else {
+            limitations.push("OSM enrichment skipped.");
+          }
+
+          if (ui.useTerrain.checked) {
+            const tOut = await enrichTerrainMax(rings);
+            facts.push(...tOut.facts); metrics.push(...tOut.metrics); limitations.push(...tOut.limitations);
+            tOut.facts.forEach((f) => {
+              if (f.geometry && f.geometry.type === "Point") {
+                L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], { radius: 6, color: "#ffd37a", weight: 2 })
+                  .bindTooltip(`terrain max: ${f.properties.max_elevation_m ?? "?"} m (${f.ring_id})`, { sticky: true })
+                  .addTo(layers.points);
+              }
+            });
+          } else {
+            limitations.push("Terrain enrichment skipped.");
+          }
+
+          const areaName = deriveAreaName(facts);
+          const mByRing = metricIndex(metrics);
+          const baseNarrative = renderNarrative(
+            areaName,
+            rings.map((r) => ({ id: r.id, inner_km: r.inner_km, outer_km: r.outer_km })),
+            mByRing,
+            limitations
+          );
+
+          let narrative = baseNarrative;
+          if (ui.aiMode.value === "gemini") {
+            const key = (ui.geminiKey.value || "").trim();
+            if (!key) throw new Error("Gemini mode selected, but no API key was provided.");
+            const payload = buildGeminiPayload({
+              areaName,
+              rings: rings.map((r) => ({ id: r.id, inner_km: r.inner_km, outer_km: r.outer_km })),
+              metrics: metrics.map((m) => ({ ring_id: m.ring_id, key: m.key, value: m.value, unit: m.unit ?? null })),
+              limitations,
+            });
+            try {
+              narrative = await generateNarrativeWithGemini({ apiKey: key, payload });
+            } catch (e) {
+              narrative = baseNarrative + `\n\n[Gemini unavailable: ${e.message || e}]`;
+            }
+          }
+
+          const report = {
+            generated_at: new Date().toISOString(),
+            area_name: areaName,
+            rings: rings.map((r) => ({ id: r.id, inner_km: r.inner_km, outer_km: r.outer_km, geojson: r.feature })),
+            upload_geojson: uploadGJ,
+            facts,
+            metrics,
+            narrative,
+            limitations,
+          };
+          lastReport = report;
+
+          ui.tabNarrative.textContent = narrative;
+          ui.tabMetrics.textContent = Object.entries(mByRing)
+            .map(([rid, m]) => {
+              const keys = Object.keys(m).sort();
+              return [rid, ...keys.map((k) => `- ${k}: ${m[k]}`)].join("\n");
+            })
+            .join("\n\n");
+          ui.tabLimitations.textContent = (limitations || []).map((x) => `- ${x}`).join("\n");
+          ui.tabFacts.textContent = JSON.stringify({ facts: facts.slice(0, 500), metrics }, null, 2) + (facts.length > 500 ? `\n\n[truncated facts: showing 500 of ${facts.length}]` : "");
+          ui.downloadBtn.disabled = false;
+        } catch (e) {
+          ui.tabNarrative.textContent = `Error: ${e.message || e}`;
+        } finally {
+          ui.runBtn.disabled = false;
+          ui.runBtn.textContent = "Run analysis";
+        }
+      });
+    </script>
+  </body>
+</html>
+

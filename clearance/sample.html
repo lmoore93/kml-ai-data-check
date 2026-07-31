@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clearance — sample</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #07111f;
+      --line: rgba(168, 208, 255, 0.14);
+      --text: #e8f1ff;
+      --muted: #8fa6c4;
+      --sky: #3ec6ff;
+      --signal: #2ee6a8;
+      --amber: #f0b429;
+      --coral: #ff6b5a;
+      --panel: rgba(14, 28, 48, 0.78);
+      --font-d: 'Syne', sans-serif;
+      --font-b: 'Figtree', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font-b);
+      color: var(--text);
+      min-height: 100vh;
+      background:
+        radial-gradient(900px 520px at 12% -10%, rgba(62, 198, 255, 0.18), transparent 55%),
+        radial-gradient(700px 480px at 90% 8%, rgba(46, 230, 168, 0.1), transparent 50%),
+        linear-gradient(180deg, #0a1628 0%, var(--ink) 48%, #050b14 100%);
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.3;
+      background-image:
+        linear-gradient(rgba(168, 208, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168, 208, 255, 0.05) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+    }
+    .wrap { width: min(980px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 48px; position: relative; }
+    h1, h2, .brand { font-family: var(--font-d); letter-spacing: -0.03em; }
+    .hero { margin-bottom: 28px; animation: rise .45s ease both; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--sky); font-weight: 700; font-size: .78rem;
+      letter-spacing: .08em; text-transform: uppercase;
+    }
+    .mark {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(145deg, #3ec6ff, #1494d4);
+      box-shadow: 0 8px 24px rgba(62, 198, 255, .25);
+    }
+    .hero h1 { margin: 10px 0 8px; font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; line-height: .98; }
+    .hero p { margin: 0; color: var(--muted); max-width: 46ch; line-height: 1.45; }
+    .grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; }
+    .panel {
+      border: 1px solid var(--line); border-radius: 16px;
+      background: var(--panel); backdrop-filter: blur(12px);
+      padding: 18px; animation: rise .5s ease both;
+    }
+    .panel h2 { margin: 0 0 12px; font-size: 1.05rem; }
+    .mission {
+      border: 1px solid var(--line); border-radius: 14px;
+      padding: 14px 16px; margin-bottom: 10px;
+      background: linear-gradient(180deg, rgba(18, 37, 61, .85), rgba(12, 26, 44, .7));
+    }
+    .mission:last-child { margin-bottom: 0; }
+    .mission-top { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .mission h3 { margin: 0 0 6px; font-size: 1rem; font-family: var(--font-d); }
+    .meta { color: var(--muted); font-size: .8rem; display: flex; flex-wrap: wrap; gap: 8px 12px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 9px; border-radius: 999px; font-size: .68rem;
+      font-weight: 700; text-transform: uppercase; letter-spacing: .02em;
+      border: 1px solid transparent; white-space: nowrap;
+    }
+    .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .pending { color: var(--amber); background: rgba(240,180,41,.12); border-color: rgba(240,180,41,.25); }
+    .ready { color: var(--signal); background: rgba(46,230,168,.1); border-color: rgba(46,230,168,.22); }
+    .final { color: #9aa8bd; background: rgba(154,168,189,.1); border-color: rgba(154,168,189,.18); }
+    .kv { display: grid; gap: 10px; margin: 0 0 14px; }
+    .kv div { border-bottom: 1px solid rgba(168,208,255,.08); padding-bottom: 8px; }
+    .kv dt { color: var(--muted); font-size: .72rem; }
+    .kv dd { margin: 2px 0 0; font-weight: 600; font-size: .92rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    button {
+      appearance: none; border: 0; border-radius: 12px;
+      padding: 10px 14px; font: inherit; font-weight: 700; cursor: pointer;
+    }
+    .btn-ok { background: linear-gradient(135deg, var(--signal), #7dffc9); color: #04261b; }
+    .btn-no { background: linear-gradient(135deg, #ff7a6b, #e4483a); color: #fff; }
+    .btn-ghost { background: rgba(255,255,255,.05); color: var(--text); border: 1px solid var(--line); }
+    textarea {
+      width: 100%; min-height: 72px; margin: 8px 0 10px; resize: vertical;
+      border-radius: 12px; border: 1px solid var(--line);
+      background: rgba(0,0,0,.22); color: var(--text);
+      padding: 10px 12px; font: inherit;
+    }
+    .note { color: var(--muted); font-size: .8rem; margin: 12px 0 0; line-height: 1.4; }
+    .toast {
+      display: none; margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+      background: rgba(46,230,168,.12); color: var(--signal); font-weight: 600; font-size: .88rem;
+    }
+    .toast.show { display: block; animation: rise .3s ease both; }
+    .flow {
+      display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0;
+      color: var(--muted); font-size: .78rem; font-weight: 600;
+    }
+    .flow span {
+      padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line);
+      background: rgba(255,255,255,.03);
+    }
+    .flow .on { color: var(--sky); border-color: rgba(62,198,255,.35); }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="eyebrow"><span class="mark" aria-hidden="true"></span> Clearance</div>
+      <h1>Mission clearance for remote pilots.</h1>
+      <p>
+        Sample HTML of the approval loop: remote pilot loads a mission,
+        Senior / Chief Remote Pilot signs off. Open this file in any browser — no build required.
+      </p>
+      <div class="flow">
+        <span>Draft</span>
+        <span class="on">Pending approval</span>
+        <span>Ready to fly</span>
+        <span>Completed</span>
+        <span>Finalised</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Mission queue</h2>
+
+        <article class="mission" id="m1">
+          <div class="mission-top">
+            <div>
+              <h3>Bridge deck inspection — West Gate approach</h3>
+              <div class="meta">
+                <span>CLR-2026-014</span>
+                <span>Melbourne VIC</span>
+                <span>Alex Chen · OSPREY-1</span>
+                <span>80 m AGL · VLOS</span>
+              </div>
+            </div>
+            <span class="badge pending" id="status1">Pending approval</span>
+          </div>
+        </article>
+
+        <article class="mission">
+          <div class="mission-top">
+            <div>
+              <h3>Solar farm orthomosaic — Mildura</h3>
+              <div class="meta">
+                <span>CLR-2026-015</span>
+                <span>Mildura VIC</span>
+                <span>Sam Rivera · OSPREY-2</span>
+                <span>Approved by Jordan Blake (SRP)</span>
+              </div>
+            </div>
+            <span class="badge ready">Ready to fly</span>
+          </div>
+        </article>
+
+        <article class="mission">
+          <div class="mission-top">
+            <div>
+              <h3>Emergency services training — Ballarat</h3>
+              <div class="meta">
+                <span>CLR-2026-012</span>
+                <span>Finalised by Morgan Hale (CRP)</span>
+              </div>
+            </div>
+            <span class="badge final">Finalised</span>
+          </div>
+        </article>
+      </section>
+
+      <aside class="panel">
+        <h2>SRP / CRP sign-off</h2>
+        <dl class="kv">
+          <div>
+            <dt>Mission</dt>
+            <dd>CLR-2026-014 · West Gate approach</dd>
+          </div>
+          <div>
+            <dt>Risk notes</dt>
+            <dd style="font-weight:500">Public corridor below. Spotters on both banks. Abort if wind &gt; 10 m/s.</dd>
+          </div>
+          <div>
+            <dt>Approver</dt>
+            <dd>Jordan Blake · Senior Remote Pilot</dd>
+          </div>
+        </dl>
+
+        <label for="comment" style="color:var(--muted);font-size:.78rem;font-weight:600">Approval comment</label>
+        <textarea id="comment" placeholder="Conditions / notes for the RPIC…">Approved. Maintain radio watch; abort if traffic increases.</textarea>
+
+        <div class="actions">
+          <button class="btn-ok" type="button" onclick="approve()">Approve &amp; clear</button>
+          <button class="btn-no" type="button" onclick="reject()">Reject</button>
+          <button class="btn-ghost" type="button" onclick="resetSample()">Reset</button>
+        </div>
+        <div class="toast" id="toast"></div>
+        <p class="note">
+          This is a static sample. The full interactive app is in <code>clearance/</code>
+          (<code>(npm run dev)</code>.
+        </p>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status1');
+    const toast = document.getElementById('toast');
+
+    function flash(msg, ok) {
+      toast.textContent = msg;
+      toast.style.color = ok ? 'var(--signal)' : 'var(--coral)';
+      toast.style.background = ok ? 'rgba(46,230,168,.12)' : 'rgba(255,107,90,.12)';
+      toast.classList.add('show');
+    }
+
+    function approve() {
+      const note = document.getElementById('comment').value.trim() || 'Approved';
+      statusEl.className = 'badge ready';
+      statusEl.textContent = 'Ready to fly';
+      flash('Signed off by SRP — mission cleared. ' + note, true);
+    }
+
+    function reject() {
+      statusEl.className = 'badge pending';
+      statusEl.textContent = 'Rejected';
+      statusEl.style.color = 'var(--coral)';
+      statusEl.style.background = 'rgba(255,107,90,.12)';
+      statusEl.style.borderColor = 'rgba(255,107,90,.25)';
+      flash('Returned to remote pilot for revision.', false);
+    }
+
+    function resetSample() {
+      statusEl.className = 'badge pending';
+      statusEl.textContent = 'Pending approval';
+      statusEl.removeAttribute('style');
+      toast.classList.remove('show');
+      document.getElementById('comment').value =
+        'Approved. Maintain radio watch; abort if traffic increases.';
+    }
+  </script>
+</body>
+</html>

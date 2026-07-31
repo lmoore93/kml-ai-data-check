@@ -4,7 +4,11 @@ Flight authorisation for remote pilots — simpler than AVCRM / Fly Freely, focu
 
 **Remote Pilot** loads a mission → **Senior Remote Pilot** or **Chief Remote Pilot** signs off → fly with an audit trail → finalise the record.
 
-## Quick start
+## Quick look (no build)
+
+Open [`sample.html`](./sample.html) in a browser for a static preview of the approval UI.
+
+## Quick start (full app)
 
 ```bash
 cd clearance
